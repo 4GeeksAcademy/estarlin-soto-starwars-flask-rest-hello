@@ -6,7 +6,9 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     user_name = db.Column(db.String(120), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
-    password = db.Column(db.String(80), unique=False, nullable=False)  
+    password = db.Column(db.String(80), unique=False, nullable=False) 
+    favorites_planets = db.relationship('Favorites_Planets', backref='user', lazy=True)
+    favorites_chars = db.relationship('Favorites_People', backref='user', lazy=True)
 
 class People(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
@@ -18,6 +20,7 @@ class People(db.Model):
     hair_color = db.Column(db.String(50), unique=False, nullable=False)
     birth_year = db.Column(db.String(50), unique=False, nullable=False)
     gender = db.Column(db.String(50), unique=False, nullable=False)
+    favorite = db.relationship('Favorites_People', backref='people', lazy=True)
 
 class Planets (db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -30,11 +33,17 @@ class Planets (db.Model):
     terrain = db.Column(db.String(20), unique=False, nullable=False)
     surface_water = db.Column(db.String(20), unique=False, nullable=False)
     population = db.Column(db.String(20), unique=False, nullable=False)
+    favorite = db.relationship('Favorites_Planets', backref='planets', lazy=True)
 
-class Favorites (db.Model):
+class Favorites_Planets (db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    planet_fav = db.Column(db.String(50), unique=True, nullable=False)
-    char_fav = db.Column(db.String(50), unique=True, nullable=False)
+    user_id =  db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    planet_fav_id = db.Column(db.Integer, db.ForeignKey('planets.id'), nullable=False)
+
+class Favorites_People (db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id =  db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    char_fav_id = db.Column(db.Integer, db.ForeignKey('people.id'), nullable=False)
 
 
     def __repr__(self):
@@ -47,7 +56,10 @@ class Favorites (db.Model):
         return '<Planets %r>' % self.id 
     
     def __repr__(self):
-        return '<Favorites %r>' %self.id
+        return '<Favorites_Planets %r>' %self.id
+    
+    def __repr__(self):
+        return '<Favorites_People %r>' %self.id
 
     def serialize(self):
         return {
@@ -80,9 +92,14 @@ class Favorites (db.Model):
             "surface_water" : self.surface_water,
             "population" : self.population,
             
-            #
-             "id" : self.id,
-            "planet_fav" : self.planet_fav,
-            "people_fav" : self.people_fav,
+            #serializacion de la tabla favorites_planets
+            "id" : self.id,
+            'user_id' : self.user_id,
+            "planet_fav_id" : self.planet_fav_id,
+            
+             #serializacion de la tabla favorites_planets
+            "id" : self.id,
+            'user_id' : self.user_id,
+            "char_fav_id" : self.char_fav_id,
             
         }

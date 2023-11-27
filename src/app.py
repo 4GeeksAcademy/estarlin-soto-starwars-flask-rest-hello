@@ -8,7 +8,7 @@ from flask_swagger import swagger
 from flask_cors import CORS
 from utils import APIException, generate_sitemap
 from admin import setup_admin
-from models import db, User, People, Planets
+from models import db, User, People, Planets, Favorites_Planets, Favorites_People
 
 
 
@@ -37,19 +37,13 @@ def handle_invalid_usage(error):
 def sitemap():
     return generate_sitemap(app)
 
-@app.route('/user', methods=['GET'])
-def handle_hello():
-    
-    response_body = {
-        "msg": "Hello, this is your GET /user response "
-    }
-
-    return jsonify(response_body), 200
 
 @app.route('/people')
 def get_all_people():
-    
+    #hago un query all para retornar todas las columnas de la tabla people
     all_people = People.query.all()
+
+    #hago un for in para luego retornarlo en formato json 
     people_list = [{
         "id":  people.id, 
         'name': people.name, 
@@ -68,6 +62,7 @@ def get_all_people():
     
 @app.route('/people/<int:char_id>')
 def get_people_by_id(char_id):
+    #hago un query.get para traer el id del personaje para luego devolverlo en formato json
     people = People.query.get(char_id)
     if people:
         return jsonify({
@@ -81,12 +76,15 @@ def get_people_by_id(char_id):
             'gender' : people.gender,
             'mass' : people.mass,       
             }), 200
+    # en caso de que el id de ese personaje no exista se retorna un mensaje de error 
     else :
-        return {'msg' : 'That user dont exist :('}
-
+        return jsonify ( {'msg' : 'this character not exist :('}), 404
+    
+# declaro mi decorador con un metodo POST
 @app.route('/people/create', methods=['POST'])
 def create_new_char():
 
+#mediante los datos capturados del request declaro el objeto new_people
     new_people = People(
         name = request.json.get('name'), 
         eye_color =  request.json.get('eye_color'), 
@@ -97,26 +95,44 @@ def create_new_char():
         birth_year = request.json.get('birth_year'),
         gender = request.json.get('gender'),
         )
-    db.session.add(new_people)
-    db.session.commit()
-    return jsonify({
-            'id': new_people.id,
-            'name' : new_people.name,
-            'eye_color': new_people.eye_color,
-            'skin_color' : new_people.skin_color,
-            'mass' : new_people.mass,
-            'hair_color' : new_people.hair_color,
-            'height' : new_people.height,
-            'birth_year' : new_people.birth_year,
-            'gender' : new_people.gender
-            }), 200
+
+    #creo una peticion a la base de dato con el nombre del personaje que llega en body del request    
+    people_exist_db = People.query.filter_by(name = new_people.name).first()
+
+    # mediante el este if me aseguro de que el personaje no exista en la base de datos
+    # en caso de que exista retorno un mensaje notificando de que ese personaje ya existe
+    if not people_exist_db:
+
+        #guardo los datos en base y devuelvo el objeto en formato json
+        db.session.add(new_people)
+        db.session.commit()
+
+        return jsonify({
+                'id': new_people.id,
+                'name' : new_people.name,
+                'eye_color': new_people.eye_color,
+                'skin_color' : new_people.skin_color,
+                'mass' : new_people.mass,
+                'hair_color' : new_people.hair_color,
+                'height' : new_people.height,
+                'birth_year' : new_people.birth_year,
+                'gender' : new_people.gender
+                }), 200
+    
+    else :
+        return jsonify({'msg': 'this character already exist'}), 400
+    
+
 
 @app.route('/people/edit/<int:char_id>', methods=['PUT'])
 def edit_char_by_id(char_id):
-
+    #busco el personaje mediante el id recivido en el path
     char_from_db = People.query.get(char_id)
 
+    #me aseguro de que el usuario que se quiere editar existe en la base de datos
     if char_from_db:   
+
+        #reasigno los valores existentes en la base de datos con los capturados en en body del request 
         char_from_db.name = request.json.get('name')
         char_from_db.eye_color =  request.json.get('eye_color')
         char_from_db.skin_color =  request.json.get('skin_color')
@@ -125,6 +141,8 @@ def edit_char_by_id(char_id):
         char_from_db.height = request.json.get('height')
         char_from_db.birth_year = request.json.get('birth_year')
         char_from_db.gender = request.json.get('gender')
+        
+        #guardo los cambios en la base de datos
         db.session.commit()
 
         return jsonify({
@@ -139,15 +157,17 @@ def edit_char_by_id(char_id):
             'mass' : char_from_db.mass,
             
         }), 200
+    
     else:
         return jsonify({
-            'msg' : 'that char dont exits'
+            'msg' : 'this char not exits'
         }), 404
     
 @app.route('/people/delete/<int:char_id>', methods=['DELETE'])
 def delete_char_by_id(char_id):
     user_exist_db = People.query.get(char_id)
 
+    #me aseguro de que el usuario que se quiere eliminar existe en la base de datos
     if user_exist_db:
         db.session.delete(user_exist_db)
         db.session.commit()
@@ -159,7 +179,7 @@ def delete_char_by_id(char_id):
             'msg' : 'this character not exist :(' 
         })
 
-#planets end points
+#-----------------------planets end points------------------------------------
 
 @app.route('/planets')
 def get_all_planets():
@@ -184,8 +204,10 @@ def get_all_planets():
     
 @app.route('/planets/<int:planet_id>')
 def get_planet_by_id(planet_id):
+
     planet = Planets.query.get(planet_id)
     if planet:
+
         return jsonify({
              "id":  planet.id, 
             'planet_name': planet.planet_name, 
@@ -198,8 +220,9 @@ def get_planet_by_id(planet_id):
             'terrain' : planet.terrain,   
             'population' : planet.population,      
             }), 200
+    
     else :
-        return {'msg' : 'That planet not exist :('}
+        return jsonify({'msg' : 'That planet not exist :('}), 404
 
 @app.route('/planets/create', methods=['POST'])
 def create_new_planet():
@@ -215,20 +238,28 @@ def create_new_planet():
         terrain = request.json.get('terrain'),
         population = request.json.get('population'),
         )
-    db.session.add(new_planet)
-    db.session.commit()
-    return jsonify({
-            "id":  new_planet.id, 
-            'planet_name': new_planet.planet_name, 
-            'rotation_period' : new_planet.rotation_period, 
-            'orbital_period' : new_planet.orbital_period,
-            'diameter' : new_planet.diameter,
-            'climate' : new_planet.climate,
-            'gravity' : new_planet.gravity, 
-            'surface_water' : new_planet.surface_water,
-            'terrain' : new_planet.terrain,   
-            'population' : new_planet.population,     
-            }), 200
+    
+    planet_exist_db = Planets.query.filter_by(planet_name = new_planet.planet_name).first()
+    
+    if not planet_exist_db:
+
+        db.session.add(new_planet)
+        db.session.commit()
+        return jsonify({
+                "id":  new_planet.id, 
+                'planet_name': new_planet.planet_name, 
+                'rotation_period' : new_planet.rotation_period, 
+                'orbital_period' : new_planet.orbital_period,
+                'diameter' : new_planet.diameter,
+                'climate' : new_planet.climate,
+                'gravity' : new_planet.gravity, 
+                'surface_water' : new_planet.surface_water,
+                'terrain' : new_planet.terrain,   
+                'population' : new_planet.population,     
+                }), 200
+    else :
+        return jsonify({'msg': 'this planet already exist'}), 400
+
 
 @app.route('/planets/edit/<int:planet_id>', methods=['PUT'])
 def edit_planet_by_id(planet_id):
@@ -260,6 +291,7 @@ def edit_planet_by_id(planet_id):
             'population' : planet_from_db.population,    
             
         }), 200
+    
     else:
         return jsonify({ 'msg' : 'that Planet not exits' }), 404
     
@@ -275,22 +307,152 @@ def delete_planet_by_id(planet_id):
         })
     else:
         return jsonify({
-            'msg' : 'this planet not exist :(' 
+            'msg' : 'that planet not exist :(' 
         })
 
-# User End points
+# -------------------------------------------User End points--------------------------------------------
 @app.route('/users')
 def get_all_users():
     all_users = User.query.all()
     list_of_users = [{
+        'id' : user.id,
         'user_name' : user.user_name,
 
     } for user in all_users]
+
     return jsonify(list_of_users), 200
 
+@app.route('/user/<int:user_id>/favorites')
+def get_all_favorites(user_id):
+    #all_favs = Favorites_Planets.query.filter_by(user_id = user_id)
+    user_query = User.query.filter_by(id = user_id).first()
+    list_of_planets = user_query.favorites_planets + user_query.favorites_chars
+   
+    list_of_fav = [{
+        'user_id' : fav.user_id,
+        #'user_name' : user_query.user_name,
+       # 'planet_fav_id' : fav.planet_fav_id,
+        #'planet_name' : Planets.query.filter_by(id = fav.planet_fav_id).first().planet_name,
+        #'character_name' : People.query.filter_by(id = fav.char_fav_id).first().name
+        
+    } for fav in user_query.favorites_planets]
+
+
+    if list_of_fav :
+        return jsonify(list_of_fav), 200
+    
+    else :
+        return jsonify({'msg' : 'this user not exist or not have favorites'}), 404
+
+#--------------------------planetas favoritos end points-------------------------------------------
+@app.route('/user/<int:user_id>/favorites/planet/<int:planet_id>', methods=['POST'])
+def add_fav_planet_by_id(user_id, planet_id):
+    user_exits_db = User.query.get(user_id)
+    planet_exist_db = Planets.query.get(planet_id)
+    user_and_planet_exist_table = Favorites_Planets.query.filter_by(planet_fav_id= planet_id, user_id = user_id).first()
+
+    #me aseguro de que tanto el usuario  como el planeta existan en la base de datos para poder agregarlos
+    if user_exits_db and planet_exist_db : 
+
+    #me aseguro de que el planeta no exista en la tabla de planetas favoritos        
+            if not user_and_planet_exist_table:
+
+                new_fav_planet = Favorites_Planets(user_id = user_exits_db.id, planet_fav_id = planet_exist_db.id)
+                db.session.add(new_fav_planet)
+                db.session.commit()
+
+                return jsonify({
+                    'planet_id' : planet_exist_db.id,    
+                    'planet_fav_name' : planet_exist_db.planet_name,
+                    'user_name' : user_exits_db.user_name,
+                    'user_id' : user_exits_db.id,                  
+                })
+            
+            else:
+                return jsonify({
+                    'msg' : 'that planet already exist'
+                }), 400
+        
+    else:
+        return jsonify({'msg' : 'the planet or the user not esxist :('}), 404
+    
+@app.route('/delete/favorites/user/<int:user_id>/planet/<int:planet_id>', methods=['DELETE'])
+def delete_fav_planet_by_id(user_id, planet_id):
+   
+   #hago una busqueda donde el planet_id y el user_id esten en la misma fila
+    search_planet_and_user_favorites_table = Favorites_Planets.query.filter_by( planet_fav_id = planet_id, user_id = user_id).first()
+
+    if search_planet_and_user_favorites_table:
+
+        #guardo los cambios en la base de datos
+        db.session.delete(search_planet_and_user_favorites_table)
+        db.session.commit()
+        return jsonify({
+            'msg' : 'planet deleted!'
+        }), 200
+
+    else:
+        return jsonify({
+            'msg' : 'this user or this planet not exist'
+        }), 404
+
+#--------------------------------------------personajes favoritos end points----------------------------------------------
+@app.route('/user/<int:user_id>/favorites/people/<int:people_id>', methods=['POST'])
+def add_fav_people_by_id(user_id, people_id):
+    user_exits_db = User.query.get(user_id)
+    people_exist_db = People.query.get(people_id)
+    user_and_people_exist_table = Favorites_People.query.filter_by(char_fav_id= people_id, user_id = user_id).first()
+
+    #me aseguro de que tanto el usuario  como el personaje existan en la base de datos para poder agregarlos
+    if user_exits_db and people_exist_db : 
+
+    #me aseguro de que el personaje no exista en la tabla de personajes favoritos        
+            if not user_and_people_exist_table:
+
+                new_fav_char = Favorites_People(user_id = user_exits_db.id, char_fav_id = people_exist_db.id)
+                db.session.add(new_fav_char)
+                db.session.commit()
+
+                return jsonify({
+                    'people_id' : people_exist_db.id,    
+                    'people_fav_name' :people_exist_db.name,
+                    'user_name' : user_exits_db.user_name,
+                    'user_id' : user_exits_db.id,                  
+                })
+            
+            else:
+                return jsonify({
+                    'msg' : 'this character already exist'
+                }), 400
+        
+    else:
+        return jsonify({'msg' : 'the character or the user not esxist :('}), 404
+    
+
+
+@app.route('/delete/favorites/user/<int:user_id>/people/<int:people_id>', methods=['DELETE'])
+def delete_fav_people_by_id(user_id, people_id):
+   
+   #hago una busqueda donde el people_id y el user_id esten en la misma fila
+    search_people_and_user_favorites_table = Favorites_People.query.filter_by( char_fav_id = people_id, user_id = user_id).first()
+
+    if search_people_and_user_favorites_table:
+
+        #guardo los cambios en la base de datos
+        db.session.delete(search_people_and_user_favorites_table)
+        db.session.commit()
+        return jsonify({
+            'msg' : 'character deleted!'
+        }), 200
+
+    else:
+        return jsonify({
+            'msg' : 'this user or this character not exist'
+        }), 404
+    
 
 
 # this only runs if `$ python src/app.py` is executed
 if __name__ == '__main__':
-    PORT = int(os.environ.get('PORT', 3020))
+    PORT = int(os.environ.get('PORT', 3000))
     app.run(host='0.0.0.0', port=PORT, debug=False)
