@@ -322,27 +322,45 @@ def get_all_users():
 
     return jsonify(list_of_users), 200
 
+
 @app.route('/user/<int:user_id>/favorites')
 def get_all_favorites(user_id):
-    #all_favs = Favorites_Planets.query.filter_by(user_id = user_id)
     user_query = User.query.filter_by(id = user_id).first()
-    list_of_planets = user_query.favorites_planets + user_query.favorites_chars
-   
-    list_of_fav = [{
-        'user_id' : fav.user_id,
-        #'user_name' : user_query.user_name,
-       # 'planet_fav_id' : fav.planet_fav_id,
-        #'planet_name' : Planets.query.filter_by(id = fav.planet_fav_id).first().planet_name,
-        #'character_name' : People.query.filter_by(id = fav.char_fav_id).first().name
+
+    #me aseguro de que el usuario exista en la base datos
+    if user_query:
+
+    #hago un blucle for accediendo a la tabla favorites planets mediante el foreinkey 
+        list_of_fav_planets = [{
+            'user_id' : fav.user_id,
+            'user_name' : user_query.user_name,
+            'planet_fav_id' : fav.planet_fav_id,
+            'planet_name' : Planets.query.filter_by(id = fav.planet_fav_id).first().planet_name,    
+            
+        } for fav in user_query.favorites_planets]
+
+    #hago un blucle for accediendo a la tabla favorites planets mediante el foreinkey 
+        list_of_fav_chars = [{
+                'user_id' : fav.user_id,
+                'user_name' : user_query.user_name,
+                'char_fav_id' : fav.char_fav_id,
+                'char_name' : People.query.filter_by(id = fav.char_fav_id).first().name,    
+                
+            } for fav in user_query.favorites_chars]
+
+        #en caso de que el usuario no tenga favoritos retorno el siguiente mensaje
+        if len(list_of_fav_chars) == 0 and len(list_of_fav_planets) == 0:
+            return jsonify({'msg': 'this user dont have favorites planets and characters'}), 400 
         
-    } for fav in user_query.favorites_planets]
-
-
-    if list_of_fav :
-        return jsonify(list_of_fav), 200
+        #retorno un objeto en formato json de forma ordenada
+        return jsonify( {
+                         'planets_fav_list' : list_of_fav_planets,
+                         'chars_fav_list' : list_of_fav_chars
+                          }), 200
     
     else :
-        return jsonify({'msg' : 'this user not exist or not have favorites'}), 404
+        #en caso de que el usuario no exista 
+        return jsonify({'msg' : 'this user not exist :('}), 404
 
 #--------------------------planetas favoritos end points-------------------------------------------
 @app.route('/user/<int:user_id>/favorites/planet/<int:planet_id>', methods=['POST'])
